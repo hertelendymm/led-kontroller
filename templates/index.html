@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LED Vezérlés</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 50px; }
+        #ledImage { 
+            width: 250px; 
+            height: auto; 
+            margin-bottom: 20px; 
+            border: 0px solid #ddd; 
+            padding: 5px;
+        }
+        #ledButton { padding: 15px 30px; font-size: 1.2em; cursor: pointer; border-radius: 5px; border: none; color: white; }
+        .on { background-color: #4CAF50; }
+        .off { background-color: #f44336; }
+        #statusText { margin-top: 20px; font-size: 1.1em; }
+    </style>
+</head>
+<body>
+    <h1>LED Vezérlés Webszerverről</h1>
+    <img id="ledImage" src="/static/images/light_off.png" alt="LED Állapota"> 
+    <button id="ledButton">Betöltés...</button>
+    <p id="statusText">Aktuális állapot: Ismeretlen</p>
+
+    <script>
+        const ledButton = document.getElementById('ledButton');
+        const statusText = document.getElementById('statusText');
+        const ledImage = document.getElementById('ledImage'); 
+        let clientSideLedState = false; 
+
+
+        function updateUI() {
+            if (clientSideLedState) {
+                ledButton.textContent = 'LED Kikapcsolása';
+                ledButton.className = 'off';
+                statusText.textContent = 'Aktuális állapot: BEKAPCSOLVA';
+                ledImage.src = '/static/images/light_on.png'; 
+                ledImage.alt = 'LED Bekapcsolva';
+            } else {
+                ledButton.textContent = 'LED Bekapcsolása';
+                ledButton.className = 'on';
+                statusText.textContent = 'Aktuális állapot: KIKAPCSOLVA';
+                ledImage.src = '/static/images/light_off.png';
+                ledImage.alt = 'LED Kikapcsolva';
+            }
+        }
+
+
+        async function fetchLedState() {
+            try {
+                const response = await fetch('/api/led/state');
+                if (!response.ok) {
+                    throw new Error(`Szerverhiba: ${response.status}`);
+                }
+                const data = await response.json();
+                clientSideLedState = data.state;
+                updateUI();
+            } catch (error) {
+                console.error('Hiba az állapot lekérésekor:', error);
+                statusText.textContent = 'Hiba az állapot lekérésekor.';
+                ledButton.textContent = 'Hiba';
+            }
+        }
+
+        ledButton.addEventListener('click', async () => {
+            const newDesiredState = !clientSideLedState; 
+            try {
+                const response = await fetch('/api/led/state', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ state: newDesiredState }),
+                });
+                if (!response.ok) {
+                    throw new Error(`Szerverhiba: ${response.status}`);
+                }
+                const data = await response.json();
+                clientSideLedState = data.state; 
+                updateUI();
+            } catch (error) {
+                console.error('Hiba az állapot beállításakor:', error);
+                statusText.textContent = 'Hiba az állapot beállításakor.';
+                // Hiba esetén érdemes lehet újra lekérni a valós állapotot
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', fetchLedState);
+    </script>
+</body>
+</html>
